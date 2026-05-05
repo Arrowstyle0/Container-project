@@ -178,4 +178,6 @@ npm run build
 
 ## Author
 
-Secure File Vault was built as a full-stack file vault project using Angular, Node.js, Express, MongoDB, Backblaze B2, and browser-based encryption.
+Secure File Vault was built as a full-stack file vault project using Angular, Node.js, Express, MongoDB, Backblaze B2, and browser-based encryption 
+by Aabhansh Srivastava.
+
