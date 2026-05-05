@@ -1,0 +1,18 @@
+<div class="form-container">
+  <span class="badge">Access</span>
+  <h2>Enter a drop</h2>
+  
+  <form (submit)="onAccess(); $event.preventDefault()">
+    <div class="form-group">
+      <label>Passkey</label>
+      <input type="text" placeholder="dd-Lq8n..." [(ngModel)]="passkey" name="passkey" required>
+      <small class="hint" *ngIf="passkey">Your passkey is {{ passkey | keyMask }}</small>
+    </div>
+
+    <button type="submit" class="btn-solid">Enter Container</button>
+  </form>
+
+  <div class="footer-link">
+    <a href="#">Lost your passkey?</a>
+  </div>
+</div>

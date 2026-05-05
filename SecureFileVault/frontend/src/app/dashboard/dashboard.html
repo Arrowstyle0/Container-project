@@ -1,0 +1,53 @@
+<div class="dashboard-container">
+  <div class="content-pane">
+    <div class="header-actions">
+      <h2>My Drop</h2>
+      <button class="btn-outline-small" (click)="logout()">Logout</button>
+    </div>
+
+    <div class="vault-actions">
+      <label class="btn-solid upload-btn" [class.disabled]="isUploading">
+        <i class="icon-upload"></i> {{ isUploading ? 'Encrypting...' : 'Upload Encrypted File' }}
+        <input type="file" (change)="handleFileUpload($event)" [disabled]="isUploading" hidden>
+      </label>
+      <button class="btn-outline danger" (click)="removeAllData()" *ngIf="files.length > 0 && !isUploading">
+        Clear Vault
+      </button>
+    </div>
+
+    <div class="upload-progress-container" *ngIf="isUploading">
+      <div class="progress-info">
+        <span class="progress-text">Uploading to Vault...</span>
+        <span class="progress-percent">{{ uploadProgress }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+      </div>
+    </div>
+
+    <div class="files-list">
+      <div class="empty-state" *ngIf="files.length === 0">
+        <p>No files uploaded yet.</p>
+        <small>Your vault is empty and secure.</small>
+      </div>
+
+      <div class="file-card" *ngFor="let file of files">
+        <div class="file-info">
+          <div class="file-icon"></div>
+          <div class="file-details">
+            <span class="filename">{{ file.filename }}</span>
+            <span class="filemeta">Expires: {{ file.expiresAt | date:'mediumDate' }}</span>
+          </div>
+        </div>
+        <div class="file-actions">
+          <button class="btn-icon" (click)="downloadFile(file._id)" title="Download">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          </button>
+          <button class="btn-icon danger" (click)="deleteFile(file._id)" title="Delete">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

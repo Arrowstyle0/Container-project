@@ -1,0 +1,32 @@
+<div class="form-container">
+  <span class="badge">Create</span>
+  <h2>Start a new drop</h2>
+  
+  <form (submit)="onCreate(); $event.preventDefault()">
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" placeholder="Your name" [(ngModel)]="name" name="name" required>
+    </div>
+
+    <div class="form-group">
+      <label>Recovery Gmail</label>
+      <input type="email" placeholder="name@gmail.com" [(ngModel)]="email" name="email" required>
+      <small class="hint">One Gmail can register one drop.</small>
+    </div>
+
+    <div class="row">
+      <div class="form-group half">
+        <label>Date of birth</label>
+        <input type="text" placeholder="mm/dd/yyyy" [(ngModel)]="dob" name="dob" required>
+      </div>
+
+      <div class="form-group half">
+        <label>Custom Passkey</label>
+        <input type="text" placeholder="my-secret-passkey" [(ngModel)]="customKey" name="customKey">
+        <small class="hint">Leave it blank for a generated key.</small>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-outline">Create Drop</button>
+  </form>
+</div>
