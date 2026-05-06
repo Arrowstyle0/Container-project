@@ -164,8 +164,7 @@ Main API routes:
 - The server stores encrypted file data, file metadata, IV values, and salts.
 - Password-derived authentication data is hashed before storage.
 - JWT tokens are used to protect file routes.
-- The `.env` file should never be committed to GitHub.
-- `node_modules` should not be committed because dependencies can be restored with `npm install`.
+
 
 ## Build
 
