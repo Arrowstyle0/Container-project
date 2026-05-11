@@ -21,16 +21,18 @@ export class ApiService {
     const res = await fetch(`${this.apiUrl}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, clientHashedAuthToken })
+      body: JSON.stringify({ email, clientHashedAuthToken }),
+      credentials: 'include'
     });
     return res.json();
   }
 
-  async login(email: string, clientHashedAuthToken: string, deviceId: string) {
+  async login(email: string, clientHashedAuthToken: string, deviceId: string, totpCode?: string) {
     const res = await fetch(`${this.apiUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, clientHashedAuthToken, deviceId, deviceName: 'Browser' })
+      body: JSON.stringify({ email, clientHashedAuthToken, deviceId, deviceName: 'Browser', totpCode }),
+      credentials: 'include'
     });
     const data = await res.json();
     if (data.token) {
@@ -39,15 +41,32 @@ export class ApiService {
     return data;
   }
 
-  async uploadFile(fileParams: { filename: string, fileData: ArrayBuffer, iv: string, salt: string }, onProgress?: (percent: number) => void) {
-    return new Promise((resolve, reject) => {
-      const formData = new FormData();
-      formData.append('file', new Blob([fileParams.fileData]));
-      formData.append('filename', fileParams.filename);
-      formData.append('iv', fileParams.iv);
-      formData.append('salt', fileParams.salt);
-      formData.append('expiresInDays', '30');
+  async logout() {
+    await fetch(`${this.apiUrl}/auth/logout`, { method: 'POST', credentials: 'include' });
+    localStorage.removeItem('token');
+  }
 
+  async setup2FA() {
+    const res = await fetch(`${this.apiUrl}/auth/2fa/generate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    return res.json();
+  }
+
+  async enable2FA(totpCode: string) {
+    const res = await fetch(`${this.apiUrl}/auth/2fa/enable`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ totpCode }),
+      credentials: 'include'
+    });
+    return res.json();
+  }
+
+  async uploadFile(fileParams: { filename: string, fileData: Blob, iv: string, salt: string }, onProgress?: (percent: number) => void) {
+    return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${this.apiUrl}/files/upload`, true);
 
@@ -55,6 +74,11 @@ export class ApiService {
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('X-File-Name', encodeURIComponent(fileParams.filename));
+      xhr.setRequestHeader('X-File-Iv', fileParams.iv);
+      xhr.setRequestHeader('X-File-Salt', fileParams.salt);
+      // We are streaming, backend needs Content-Length, which XHR sends automatically based on Blob size
 
       if (onProgress) {
         xhr.upload.onprogress = (event) => {
@@ -74,7 +98,7 @@ export class ApiService {
       };
 
       xhr.onerror = () => reject(new Error('Network error during upload'));
-      xhr.send(formData);
+      xhr.send(fileParams.fileData); // Send raw blob!
     });
   }
 
@@ -104,6 +128,44 @@ export class ApiService {
     const res = await fetch(`${this.apiUrl}/files/all`, {
       method: 'DELETE',
       headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
+  async getDevices() {
+    const res = await fetch(`${this.apiUrl}/auth/devices`, {
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    return res.json();
+  }
+
+  async setParentDevice(deviceId: string) {
+    const res = await fetch(`${this.apiUrl}/auth/devices/${deviceId}/set-parent`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async removeParentDevice(deviceId: string) {
+    const res = await fetch(`${this.apiUrl}/auth/devices/${deviceId}/remove-parent`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async getProfile() {
+    const res = await fetch(`${this.apiUrl}/auth/profile`, {
+      headers: this.getHeaders(),
+      credentials: 'include'
     });
     return res.json();
   }

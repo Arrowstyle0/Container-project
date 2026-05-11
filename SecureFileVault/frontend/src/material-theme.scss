@@ -1,0 +1,39 @@
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        theme-type: dark,
+        primary: mat.$cyan-palette,
+        tertiary: mat.$green-palette,
+      ),
+      typography: Poppins,
+      density: 0,
+    )
+  );
+}
+
+html[data-theme="light"] {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$green-palette,
+        tertiary: mat.$cyan-palette,
+      ),
+      typography: Poppins,
+      density: 0,
+    )
+  );
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  height: 100%;
+  transition: background-color 0.3s, color 0.3s;
+}

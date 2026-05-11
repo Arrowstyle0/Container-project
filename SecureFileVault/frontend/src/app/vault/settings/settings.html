@@ -1,0 +1,81 @@
+<div class="settings-header">
+  <h1 style="margin: 0; font-size: 2rem;">Account Security</h1>
+  <button class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;" (click)="loadProfile(); loadDevices()">
+    Refresh
+  </button>
+</div>
+
+<h2 class="section-title">Identity Protection</h2>
+<div class="settings-grid">
+  <div class="settings-card card">
+    <div class="card-label">MASTER PASSPHRASE</div>
+    <p style="margin: 0 0 1.5rem 0;">Last changed 42 days ago.</p>
+    <button class="btn-primary" style="font-size: 0.85rem;">Change passphrase</button>
+  </div>
+  
+  <div class="settings-card card">
+    <div class="card-label">RECOVERY EMAIL</div>
+    <p style="margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem; word-break: break-all; flex-wrap: wrap;">
+      {{ userEmail || 'Loading...' }}
+      <span class="badge green" *ngIf="emailVerified">VERIFIED</span>
+      <span class="badge" style="background: rgba(239,68,68,0.1); color: #ef4444;" *ngIf="!emailVerified && userEmail">UNVERIFIED</span>
+    </p>
+    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 1.5rem 0;">Recovery emails are sent to this address if you lose access.</p>
+    <button class="btn-secondary" style="font-size: 0.85rem;">Update email</button>
+  </div>
+
+  <div class="settings-card card">
+    <div class="card-label">TWO-FACTOR AUTHENTICATION</div>
+    <p style="margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+      Status:
+      <span class="badge green" *ngIf="is2FAEnabled">ENABLED</span>
+      <span class="badge" style="background: rgba(239,68,68,0.1); color: #ef4444;" *ngIf="!is2FAEnabled">DISABLED</span>
+    </p>
+    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 1.5rem 0;">Add an extra layer of security with TOTP apps.</p>
+    <button class="btn-secondary" style="font-size: 0.85rem;" (click)="open2FASetup()">{{ is2FAEnabled ? 'Reconfigure 2FA' : 'Configure 2FA' }}</button>
+  </div>
+</div>
+
+
+<div class="sessions-header">
+  <h2 style="margin: 0;">Active Sessions</h2>
+  <a href="javascript:void(0)" style="color: #ef4444; font-size: 0.85rem; font-weight: 600; text-decoration: none;">Logout all devices</a>
+</div>
+
+<div class="sessions-list">
+  <div class="session-item card" *ngFor="let device of devices; let i = index">
+    <div class="session-icon">D</div>
+    <div class="session-info">
+      <div style="font-weight: 600; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        {{ device.deviceName || 'Unknown Device' }}
+        <span class="badge green" *ngIf="i === 0">CURRENT DEVICE</span>
+        <span class="badge blue" *ngIf="device.isParent">PARENT</span>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-secondary);">
+        ID: {{ device.deviceId.substring(0,8) }}...
+      </div>
+    </div>
+    <div class="session-time">
+      {{ i === 0 ? 'Active now' : (device.lastUsed | date:'medium') }}
+    </div>
+  </div>
+</div>
+
+<div *ngIf="devices.length === 0" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+  No active sessions found.
+</div>
+
+<div class="modal-overlay" *ngIf="show2FASetup">
+  <div class="modal-content">
+    <h3>Setup Two-Factor Authentication</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Scan this QR code with Google Authenticator or Authy:</p>
+    <div style="background: white; padding: 1rem; border-radius: 8px; display: inline-block; margin-bottom: 1.5rem;">
+      <img [src]="qrCodeUrl" alt="2FA QR Code" style="width: 200px; height: 200px; display: block;">
+    </div>
+    <input type="text" placeholder="Enter 6-digit code" [(ngModel)]="totpCode" class="input-field" style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem;">
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+      <button class="btn-primary" style="flex: 1; min-width: 120px;" (click)="confirm2FA()">Verify & Enable</button>
+      <button class="btn-secondary" style="flex: 1; min-width: 120px;" (click)="show2FASetup = false">Cancel</button>
+    </div>
+  </div>
+</div>

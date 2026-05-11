@@ -1,0 +1,78 @@
+<div class="devices-header">
+  <h1 style="margin: 0; font-size: 2rem;">Devices Management</h1>
+  <button class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;" (click)="loadDevices()">
+    Refresh
+  </button>
+</div>
+
+<div class="hero-banner card" style="margin-bottom: 3rem;">
+  <h2 style="font-size: 1.75rem; margin: 0 0 1rem 0;">Trusted Hardware</h2>
+  <p style="color: var(--text-secondary); max-width: 600px; line-height: 1.6; margin-bottom: 2rem;">
+    Manage the physical endpoints authorized to access your vault. You can designate up to <strong style="color: var(--text-primary);">2 parent devices</strong> that bypass account lockouts from brute-force attacks.
+  </p>
+  
+  <div class="note-box">
+    Note: Parent devices improve security by always keeping you in control of your vault, even during lockouts.
+  </div>
+</div>
+
+<div class="section-header">
+  <h2 style="margin: 0;">Authorized Access Points ({{ devices.length }})</h2>
+  <div class="parent-counter" [class.maxed]="parentDeviceCount >= 2">
+    Parent Devices: {{ parentDeviceCount }} / 2
+  </div>
+</div>
+
+<div class="devices-grid">
+  <div class="device-card card" *ngFor="let device of devices">
+    <div class="device-row">
+      <div class="device-icon">D</div>
+      <div style="flex: 1; min-width: 0;">
+        <div class="device-info">
+          <div>
+            <h3 class="device-name">
+              {{ device.deviceName || 'Unknown Device' }}
+              <span class="badge green" *ngIf="device.isParent">PARENT</span>
+            </h3>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">
+              Last active: {{ device.lastUsed | date:'medium' }}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: monospace;">
+              ID: {{ device.deviceId.substring(0, 12) }}...
+            </div>
+          </div>
+        </div>
+        
+        <div class="parent-toggle-row">
+          <span class="toggle-label">Parent Device</span>
+          <mat-slide-toggle
+            [checked]="device.isParent"
+            [disabled]="!device.isParent && parentDeviceCount >= 2"
+            (change)="toggleParent(device)"
+            color="primary">
+          </mat-slide-toggle>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="devices.length === 0" class="empty-state card" style="text-align: center; padding: 4rem 2rem; margin-top: 2rem;">
+  <p style="font-size: 1.1rem; margin: 0 0 0.5rem 0;">No devices registered yet</p>
+  <p style="color: var(--text-secondary); margin: 0;">Log in from a device to register it here.</p>
+</div>
+
+<div class="info-grid" style="margin-top: 4rem;">
+  <div class="info-card">
+    <h4 style="margin: 0 0 0.5rem 0;">Recovery vs. Login</h4>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0; line-height: 1.5;">Trusted devices speed up daily access but cannot recreate master keys. Store physical backups separately.</p>
+  </div>
+  <div class="info-card">
+    <h4 style="margin: 0 0 0.5rem 0;">Zero-Proof Sync</h4>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0; line-height: 1.5;">Synchronization between devices uses local ephemeral keys that never touch our cloud storage.</p>
+  </div>
+  <div class="info-card">
+    <h4 style="margin: 0 0 0.5rem 0;">Auto-Revocation</h4>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0; line-height: 1.5;">Devices inactive for more than 90 days are automatically quarantined for your protection.</p>
+  </div>
+</div>

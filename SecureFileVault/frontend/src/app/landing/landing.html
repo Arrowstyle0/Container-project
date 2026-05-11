@@ -1,0 +1,168 @@
+<div class="landing-page">
+  <!-- Ambient glow effects -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <nav class="top-nav">
+    <div class="logo">SecureVault</div>
+    <div class="nav-actions">
+      <button class="theme-toggle" (click)="toggleTheme()" [title]="isDark ? 'Light Mode' : 'Dark Mode'">
+        <svg *ngIf="isDark" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg *ngIf="!isDark" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a routerLink="/auth" class="btn-secondary">Sign In</a>
+    </div>
+  </nav>
+
+  <main class="hero">
+    <div class="hero-content">
+      <div class="badge green">Quantum-Resistant Encryption</div>
+      <h1 class="hero-title">Your Files. Your<br>Privacy. <span class="text-accent">Anywhere.</span></h1>
+      <p class="hero-subtitle">End-to-end encrypted storage that gives you total control. You control your data. Not your device. Not your provider.</p>
+      
+      <div class="hero-actions">
+        <a routerLink="/auth" class="btn-primary">Get Started</a>
+        <a routerLink="/auth" class="btn-secondary">Sign In</a>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <h3>1M+</h3>
+          <span>Encrypted Files</span>
+        </div>
+        <div class="stat">
+          <h3>99.9%</h3>
+          <span>Uptime</span>
+        </div>
+        <div class="stat">
+          <h3>256-bit</h3>
+          <span>AES-GCM</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="hero-visual">
+      <!-- Vault preview card -->
+      <div class="vault-preview">
+        <div class="vault-header">
+          <div class="vault-dot green-dot"></div>
+          <div class="vault-dot yellow-dot"></div>
+          <div class="vault-dot red-dot"></div>
+          <span class="vault-title">SecureVault — Dashboard</span>
+        </div>
+        <div class="vault-body">
+          <div class="mini-sidebar">
+            <div class="mini-nav-item active"></div>
+            <div class="mini-nav-item"></div>
+            <div class="mini-nav-item"></div>
+          </div>
+          <div class="mini-content">
+            <div class="mini-file">
+              <div class="mini-file-icon">F</div>
+              <div class="mini-file-lines">
+                <div class="mini-line w70"></div>
+                <div class="mini-line w40"></div>
+              </div>
+              <div class="mini-badge">ENC</div>
+            </div>
+            <div class="mini-file">
+              <div class="mini-file-icon">F</div>
+              <div class="mini-file-lines">
+                <div class="mini-line w60"></div>
+                <div class="mini-line w50"></div>
+              </div>
+              <div class="mini-badge">ENC</div>
+            </div>
+            <div class="mini-file">
+              <div class="mini-file-icon">F</div>
+              <div class="mini-file-lines">
+                <div class="mini-line w80"></div>
+                <div class="mini-line w30"></div>
+              </div>
+              <div class="mini-badge">ENC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating badges -->
+      <div class="floating-badge badge-1">
+        <div class="fb-icon">AES</div>
+        <div class="fb-text">
+          <strong>AES-256 Bit</strong>
+          <span>Active Protection</span>
+        </div>
+      </div>
+      <div class="floating-badge badge-2">
+        <div class="fb-icon">ZK</div>
+        <div class="fb-text">
+          <strong>Zero Knowledge</strong>
+          <span>Server-blind</span>
+        </div>
+      </div>
+      <div class="floating-badge badge-3">
+        <div class="fb-icon pulse-ring">2FA</div>
+        <div class="fb-text">
+          <strong>TOTP Enabled</strong>
+          <span>Multi-factor Auth</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Feature strip -->
+  <section class="features-strip">
+    <div class="feature-item">
+      <div class="feature-icon">
+        <div class="fi-inner">E2E</div>
+      </div>
+      <div>
+        <strong>End-to-End Encrypted</strong>
+        <span>Data encrypted before it leaves your browser</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="feature-item">
+      <div class="feature-icon">
+        <div class="fi-inner">B2</div>
+      </div>
+      <div>
+        <strong>Cloud Distributed</strong>
+        <span>Backblaze B2 with global redundancy</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="feature-item">
+      <div class="feature-icon">
+        <div class="fi-inner">PD</div>
+      </div>
+      <div>
+        <strong>Parent Devices</strong>
+        <span>Hardware-level trust with lockout bypass</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="feature-item">
+      <div class="feature-icon">
+        <div class="fi-inner">OS</div>
+      </div>
+      <div>
+        <strong>Open Architecture</strong>
+        <span>Fully auditable, zero-backdoor design</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trusted by -->
+  <div class="trusted-section">
+    <span class="trusted-label">TRUSTED ARCHITECTURE BUILT WITH</span>
+    <div class="trusted-logos">
+      <span class="tech-pill">Argon2id</span>
+      <span class="tech-pill">AES-256-GCM</span>
+      <span class="tech-pill">WebCrypto API</span>
+      <span class="tech-pill">Backblaze B2</span>
+      <span class="tech-pill">Angular</span>
+      <span class="tech-pill">Node.js</span>
+    </div>
+  </div>
+</div>

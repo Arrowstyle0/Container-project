@@ -1,11 +1,10 @@
 const express = require('express');
-const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const File = require('../models/File');
+const User = require('../models/User');
 const b2Service = require('../services/b2Service');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 const authenticate = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -20,22 +19,46 @@ const authenticate = (req, res, next) => {
     }
 };
 
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+const requireParentDevice = async (req, res, next) => {
     try {
-        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const deviceId = req.user.deviceId;
+        if (!deviceId) {
+            return res.status(403).json({ error: 'Only parent devices can delete files. No device ID found in session.' });
+        }
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const { filename, iv, salt, expiresInDays } = req.body;
-        
-        const b2FileId = await b2Service.uploadFile(req.file.buffer, filename);
+        const device = user.trustedDevices.find(d => d.deviceId === deviceId);
+        if (!device || !device.isParent) {
+            return res.status(403).json({ error: 'Only parent devices can delete files. Set this device as a parent in Devices settings.' });
+        }
+        next();
+    } catch (err) {
+        return res.status(500).json({ error: 'Failed to verify device status' });
+    }
+};
+
+router.post('/upload', authenticate, async (req, res) => {
+    try {
+        const filename = decodeURIComponent(req.headers['x-file-name']);
+        const iv = req.headers['x-file-iv'];
+        const salt = req.headers['x-file-salt'];
+        const contentLength = req.headers['content-length'];
+
+        if (!filename || !contentLength) {
+            return res.status(400).json({ error: 'Missing headers' });
+        }
+
+        const b2FileId = await b2Service.uploadStream(req, contentLength, filename);
 
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + parseInt(expiresInDays || 30));
+        expiresAt.setDate(expiresAt.getDate() + 30);
 
         const newFile = new File({
             user: req.user.id,
             filename,
             b2FileId,
-            size: req.file.size,
+            size: parseInt(contentLength),
             iv,
             salt,
             expiresAt
@@ -78,7 +101,7 @@ router.get('/:id/download', authenticate, async (req, res) => {
     }
 });
 
-router.delete('/all', authenticate, async (req, res) => {
+router.delete('/all', authenticate, requireParentDevice, async (req, res) => {
     try {
         const userFiles = await File.find({ user: req.user.id });
         if (userFiles.length === 0) return res.json({ message: 'No files to delete' });
@@ -98,7 +121,7 @@ router.delete('/all', authenticate, async (req, res) => {
     }
 });
 
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireParentDevice, async (req, res) => {
     try {
         const fileRecord = await File.findOne({ _id: req.params.id, user: req.user.id });
         if (!fileRecord) return res.status(404).json({ error: 'File not found' });

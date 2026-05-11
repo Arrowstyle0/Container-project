@@ -2,17 +2,85 @@
   <div class="content-pane">
     <div class="header-actions">
       <h2>My Drop</h2>
-      <button class="btn-outline-small" (click)="logout()">Logout</button>
+      <div style="display: flex; gap: 1rem;">
+        <button class="btn-outline-small" (click)="loadFiles()">Refresh</button>
+        <button class="btn-outline-small" (click)="openDevices()">Devices</button>
+        <button class="btn-outline-small" (click)="open2FASetup()">Setup 2FA</button>
+        <button class="btn-outline-small" (click)="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- Devices Modal -->
+    <div class="modal-overlay" *ngIf="showDevicesModal">
+      <div class="modal-content" style="max-width: 500px; text-align: left;">
+        <h3>Manage Devices</h3>
+        <p style="color: #64748b; margin-bottom: 1.5rem;">
+          You can set up to 2 devices as a "Parent Device". Parent devices bypass temporary account lockouts.
+          <br><strong>Current Parents: {{parentDeviceCount}} / 2</strong>
+        </p>
+
+        <div style="max-height: 300px; overflow-y: auto;">
+          <div *ngFor="let device of devices" style="padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600; color: #0f172a;">
+                {{ device.deviceName || 'Unknown Device' }}
+                <span *ngIf="device.isParent" style="background: #3b82f6; color: white; padding: 0.1rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-left: 0.5rem;">Parent</span>
+              </div>
+              <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">ID: {{ device.deviceId.substring(0, 8) }}...</div>
+              <div style="font-size: 0.85rem; color: #64748b;">Last Used: {{ device.lastUsed | date:'short' }}</div>
+            </div>
+            <div>
+              <button class="btn-outline-small" 
+                      *ngIf="!device.isParent" 
+                      [disabled]="parentDeviceCount >= 2"
+                      (click)="setParentDevice(device.deviceId)">
+                Make Parent
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+          <button class="btn-solid" (click)="showDevicesModal = false">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" *ngIf="show2FASetup">
+      <div class="modal-content">
+        <h3>Setup Two-Factor Authentication</h3>
+        <p>Scan this QR code with Google Authenticator or Authy:</p>
+        <img [src]="qrCodeUrl" alt="2FA QR Code" class="qr-code">
+        <input type="text" placeholder="Enter 6-digit code" [(ngModel)]="totpCode" class="totp-input">
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+          <button class="btn-solid" (click)="confirm2FA()">Verify & Enable</button>
+          <button class="btn-outline-small" (click)="show2FASetup = false">Cancel</button>
+        </div>
+      </div>
     </div>
 
     <div class="vault-actions">
-      <label class="btn-solid upload-btn" [class.disabled]="isUploading">
-        <i class="icon-upload"></i> {{ isUploading ? 'Encrypting...' : 'Upload Encrypted File' }}
-        <input type="file" (change)="handleFileUpload($event)" [disabled]="isUploading" hidden>
-      </label>
+      <div class="drag-drop-zone" 
+           (dragover)="onDragOver($event)" 
+           (dragleave)="onDragLeave($event)" 
+           (drop)="onDrop($event)"
+           [class.drag-over]="isDragging"
+           [class.disabled]="isUploading">
+        <i class="icon-upload"></i>
+        <span>{{ isUploading ? 'Encrypting & Uploading...' : 'Drag & Drop File Here or' }}</span>
+        <label class="btn-solid upload-btn" [class.disabled]="isUploading" style="margin-left: 1rem;">
+          Browse
+          <input type="file" (change)="handleFileUpload($event)" [disabled]="isUploading" hidden>
+        </label>
+      </div>
+
       <button class="btn-outline danger" (click)="removeAllData()" *ngIf="files.length > 0 && !isUploading">
         Clear Vault
       </button>
+    </div>
+
+    <div class="search-bar" *ngIf="files.length > 0">
+      <input type="text" placeholder="Search files..." [(ngModel)]="searchQuery" (input)="filterFiles()" class="search-input">
     </div>
 
     <div class="upload-progress-container" *ngIf="isUploading">
@@ -40,6 +108,9 @@
           </div>
         </div>
         <div class="file-actions">
+          <button class="btn-icon" (click)="shareFile(file)" title="Share Link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
+          </button>
           <button class="btn-icon" (click)="downloadFile(file._id)" title="Download">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           </button>

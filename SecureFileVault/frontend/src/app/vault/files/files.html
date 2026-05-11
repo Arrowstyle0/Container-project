@@ -1,0 +1,65 @@
+<div class="files-header">
+  <div>
+    <h1 style="margin: 0; font-size: 2rem;">Secure Files</h1>
+    <p style="color: var(--text-secondary); margin-top: 0.5rem;">Manage your end-to-end encrypted storage.</p>
+  </div>
+  <div style="display: flex; align-items: center; gap: 1rem;">
+    <button class="btn-secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;" (click)="loadFiles()">
+      Refresh
+    </button>
+  </div>
+</div>
+
+<div class="files-grid" *ngIf="files.length > 0">
+  <div class="file-card card" *ngFor="let file of files">
+    <div class="card-header">
+      <div class="file-icon">F</div>
+      <div class="badge green">ENCRYPTED</div>
+      <button class="delete-btn" *ngIf="isParentDevice" (click)="deleteFile(file._id)">Delete</button>
+    </div>
+    
+    <div class="file-info">
+      <h3 class="filename" [title]="file.filename">{{ file.filename }}</h3>
+      
+      <div class="file-meta">
+        <span>{{ formatBytes(file.size || 0) }}</span>
+        <span>{{ file.createdAt | date:'mediumDate' }}</span>
+      </div>
+      
+      <div class="file-footer">
+        <div class="actions">
+          <button class="action-btn" (click)="shareFile(file)">Share</button>
+          <button class="action-btn" (click)="downloadFile(file._id)">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="empty-state" *ngIf="files.length === 0 && !isUploading">
+  <p>Your vault is empty.</p>
+</div>
+
+<div class="upload-zone card" 
+     [class.drag-over]="isDragging"
+     (dragover)="onDragOver($event)"
+     (dragleave)="onDragLeave($event)"
+     (drop)="onDrop($event)">
+     
+  <h2 style="margin: 1rem 0 0.5rem 0;">Drag and drop to secure your files</h2>
+  <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+    Files are automatically encrypted with AES-256 before leaving your browser. Max file size: 2GB.
+  </p>
+  
+  <div *ngIf="!isUploading">
+    <input type="file" id="fileUpload" style="display: none;" (change)="handleFileUpload($event)">
+    <label for="fileUpload" class="btn-primary" style="padding: 0.75rem 2rem; cursor: pointer;">Select Files</label>
+  </div>
+  
+  <div class="upload-progress" *ngIf="isUploading">
+    <div class="progress-bar-container">
+      <div class="progress-bar" [style.width]="uploadProgress + '%'"></div>
+    </div>
+    <p>Encrypting & Uploading... {{ uploadProgress.toFixed(0) }}%</p>
+  </div>
+</div>

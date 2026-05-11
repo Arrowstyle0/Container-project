@@ -1,0 +1,120 @@
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  transition: border-color 0.3s;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  margin: 0 0 1.5rem 0;
+  color: var(--text-primary);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.recovery-section {
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--danger);
+  transition: border-color 0.3s;
+}
+
+.critical-warning {
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.recovery-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.recovery-key-display {
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  font-family: monospace;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.sessions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  gap: 1.5rem;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.session-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--badge-green-bg);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--primary-accent);
+  flex-shrink: 0;
+}
+
+.session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-time {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .settings-grid { grid-template-columns: 1fr; }
+  .recovery-content { flex-direction: column; }
+  .session-item { flex-wrap: wrap; padding: 1rem; gap: 1rem; }
+  .session-time { width: 100%; text-align: right; }
+}

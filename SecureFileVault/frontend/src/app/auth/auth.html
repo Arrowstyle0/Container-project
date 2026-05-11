@@ -1,29 +1,98 @@
-<div class="split-layout">
-  <div class="left-pane">
-    <app-create-drop></app-create-drop>
-    <app-access-drop></app-access-drop>
+<div class="auth-page">
+  <div class="auth-header">
+    <div class="logo">SecureVault</div>
   </div>
-  <div class="right-pane">
-    <div class="brand">
-      <span class="logo">DD</span>
-      <span class="brand-text">Dead Drop</span>
+
+  <div class="auth-container">
+    <h2 class="auth-title">{{ isLoginMode ? 'SecureVault' : 'Initialize Vault' }}</h2>
+    <p class="auth-subtitle">
+      {{ isLoginMode ? 'Decentralized end-to-end encrypted storage for high-stakes data.' : 'Establish your zero-knowledge secure environment.' }}
+    </p>
+
+    <div class="auth-card">
+      <form (ngSubmit)="onSubmit()">
+        <div class="form-group" *ngIf="!isLoginMode">
+          <label>Username</label>
+          <input type="text" [(ngModel)]="name" name="name" class="input-field" placeholder="Identity Handle" required>
+        </div>
+        
+        <div class="form-group" *ngIf="!isLoginMode" style="display: none;">
+          <input type="date" [(ngModel)]="dob" name="dob" class="input-field">
+        </div>
+
+        <div class="form-group">
+          <label>{{ isLoginMode ? 'USERNAME' : 'Secure Email' }}</label>
+          <input type="email" [(ngModel)]="email" name="email" class="input-field" [placeholder]="isLoginMode ? 'Vault ID or email' : 'Verification Address'" required>
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; justify-content: space-between;">
+            {{ isLoginMode ? 'PASSPHRASE' : 'Master Passphrase' }}
+            <a href="#" class="forgot-link" *ngIf="isLoginMode">Forgot passphrase?</a>
+          </label>
+          <input type="password" [(ngModel)]="password" name="password" class="input-field" [placeholder]="isLoginMode ? 'Master encryption key' : 'Complex Security Key'" required>
+        </div>
+        
+        <div class="form-group" *ngIf="isLoginMode && show2FAInput">
+          <label>2FA CODE</label>
+          <input type="text" [(ngModel)]="totpCode" name="totpCode" class="input-field" placeholder="6-digit code">
+        </div>
+
+        <div class="security-strength" *ngIf="!isLoginMode">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">
+            <span>Security Strength</span>
+            <span class="text-accent">Advanced</span>
+          </div>
+          <div class="strength-bars">
+            <div class="bar active"></div>
+            <div class="bar active"></div>
+            <div class="bar active"></div>
+          </div>
+        </div>
+
+        <div class="important-info" *ngIf="!isLoginMode">
+          <p><strong>Important:</strong> After signup, you will receive a one-time recovery key. This key is the only way to restore access if you lose your passphrase.</p>
+        </div>
+
+        <div class="checkbox-group" *ngIf="isLoginMode">
+          <input type="checkbox" id="stayVerified">
+          <label for="stayVerified">Stay verified for 24 hours</label>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;">
+          {{ isLoginMode ? 'Unlock Vault' : 'Create Secure Vault' }}
+        </button>
+
+        <div class="auth-switch">
+          {{ isLoginMode ? 'New agent?' : 'Already have a vault?' }} 
+          <a href="javascript:void(0)" (click)="toggleMode()" class="text-accent">{{ isLoginMode ? 'Create an account' : 'Sign in' }}</a>
+        </div>
+      </form>
     </div>
     
-    <div class="hero-text">
-      <h1>Your <strong>Files.</strong> Your <strong>Key.</strong><br>Anywhere.</h1>
-      <p>Secure access without limits.</p>
+    <div *ngIf="recoveryKey" class="recovery-box">
+      <strong>Important!</strong> Save this Recovery Key:
+      <code>{{ recoveryKey }}</code>
     </div>
 
-    <div class="illustration">
-      <div class="card">
-        <div class="dots"><span class="dot yellow"></span><span class="dot"></span></div>
-      </div>
-      <div class="card">
-        <div class="dots"><span class="dot"></span><span class="dot yellow"></span></div>
-      </div>
-      <div class="card">
-        <div class="dots"><span class="dot yellow"></span><span class="dot blue"></span></div>
-      </div>
+    <div class="auth-footer-badge" *ngIf="isLoginMode">
+      AES-256 GCM Hardware Isolation Active
+    </div>
+
+    <div class="auth-footer-badges" *ngIf="!isLoginMode">
+      <div class="badge-pill">AES-256 Encrypted</div>
+      <div class="badge-pill">Zero Knowledge</div>
     </div>
   </div>
+
+  <footer class="auth-footer">
+    <div class="footer-left">
+      <strong>SecureVault</strong>
+      <p style="margin: 0.5rem 0 0 0;">End-to-end encrypted storage.</p>
+    </div>
+    <div class="footer-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </footer>
 </div>

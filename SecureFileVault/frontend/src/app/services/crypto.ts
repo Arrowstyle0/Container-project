@@ -18,37 +18,33 @@ export class CryptoService {
     );
   }
 
-  // Derive keys from passphrase
-  // Returns: [AuthToken (sent to server), EncryptionKey (kept local)]
   async deriveKeys(password: string): Promise<{ authToken: string, encKey: CryptoKey }> {
-    const material = await this.getMaterial(password);
-    
-    // Use a fixed salt for auth token derivation
-    const authSalt = new TextEncoder().encode("SecureFileVaultAuthSalt");
-    
-    const authTokenBits = await window.crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt: authSalt,
-        iterations: 100000,
-        hash: "SHA-256"
-      },
-      material,
-      256
-    );
+    const argon2 = (window as any).argon2;
+    // Auth Token via Argon2
+    const authRes = await argon2.hash({
+      pass: password,
+      salt: 'SecureFileVaultAuthSalt123', // Must be at least 8 bytes
+      time: 2,
+      mem: 16384,
+      hashLen: 32,
+      type: argon2.ArgonType.Argon2id
+    });
+    const authToken = authRes.hashHex;
 
-    const authToken = this.buf2hex(authTokenBits);
-
-    // Dynamic salt for encryption key is better, but since it's password based we use a different fixed salt for the encryption key,
-    // OR we derive a master encryption key, and then random salt per file. We will use a random salt per file.
-    const masterEncKey = await window.crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: new TextEncoder().encode("SecureFileVaultEncSalt"),
-        iterations: 100000,
-        hash: "SHA-256"
-      },
-      material,
+    // Master Encryption Key via Argon2
+    const encRes = await argon2.hash({
+      pass: password,
+      salt: 'SecureFileVaultEncSalt456',
+      time: 2,
+      mem: 16384,
+      hashLen: 32,
+      type: argon2.ArgonType.Argon2id
+    });
+    
+    // Import raw bytes into CryptoKey
+    const masterEncKey = await window.crypto.subtle.importKey(
+      "raw",
+      encRes.hash,
       { name: "AES-GCM", length: 256 },
       true,
       ["encrypt", "decrypt"]
@@ -57,43 +53,62 @@ export class CryptoService {
     return { authToken, encKey: masterEncKey };
   }
 
-  async encryptFile(file: File, key: CryptoKey): Promise<{ ciphertext: ArrayBuffer, iv: string, salt: string }> {
+  async encryptFile(file: File, key: CryptoKey): Promise<{ ciphertextBlob: Blob, iv: string, salt: string }> {
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    // In AES-GCM, salt is often conceptually the IV, but we just use IV. We'll generate a dummy salt string just for the API contract if needed, or just return iv.
     const saltStr = window.crypto.randomUUID(); 
 
-    const fileBuffer = await file.arrayBuffer();
-    
-    const ciphertext = await window.crypto.subtle.encrypt(
-      {
-        name: "AES-GCM",
-        iv: iv
-      },
-      key,
-      fileBuffer
-    );
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const numChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const encryptedChunks: Blob[] = [];
+
+    for (let i = 0; i < numChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunkBuffer = await file.slice(start, end).arrayBuffer();
+
+        const chunkIv = new Uint8Array(iv);
+        chunkIv[11] ^= i; // Simple increment for chunk IV
+
+        const ciphertextChunk = await window.crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: chunkIv },
+            key,
+            chunkBuffer
+        );
+        encryptedChunks.push(new Blob([ciphertextChunk]));
+    }
 
     return {
-      ciphertext,
+      ciphertextBlob: new Blob(encryptedChunks),
       iv: this.buf2hex(iv),
       salt: saltStr
     };
   }
 
-  async decryptFile(ciphertextBase64: string, ivHex: string, key: CryptoKey): Promise<ArrayBuffer> {
-    const ciphertext = this.base64ToArrayBuffer(ciphertextBase64);
+  async decryptFile(ciphertextBlob: Blob, ivHex: string, key: CryptoKey): Promise<Blob> {
     const iv = this.hex2buf(ivHex);
+    // AES-GCM adds a 16-byte auth tag to each encrypted chunk!
+    // Original chunk: 5MB. Encrypted chunk: 5MB + 16 bytes.
+    const ENCRYPTED_CHUNK_SIZE = (5 * 1024 * 1024) + 16; 
+    const numChunks = Math.ceil(ciphertextBlob.size / ENCRYPTED_CHUNK_SIZE);
+    const decryptedChunks: Blob[] = [];
 
-    const plaintext = await window.crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: iv as any
-      },
-      key,
-      ciphertext
-    );
+    for (let i = 0; i < numChunks; i++) {
+        const start = i * ENCRYPTED_CHUNK_SIZE;
+        const end = Math.min(start + ENCRYPTED_CHUNK_SIZE, ciphertextBlob.size);
+        const chunkBuffer = await ciphertextBlob.slice(start, end).arrayBuffer();
 
-    return plaintext;
+        const chunkIv = new Uint8Array(iv);
+        chunkIv[11] ^= i;
+
+        const plaintextChunk = await window.crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: chunkIv as any },
+            key,
+            chunkBuffer
+        );
+        decryptedChunks.push(new Blob([plaintextChunk]));
+    }
+
+    return new Blob(decryptedChunks);
   }
 
   private buf2hex(buffer: ArrayBuffer | Uint8Array): string {

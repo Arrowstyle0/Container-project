@@ -9,8 +9,14 @@ const emailService = require('./services/emailService');
 dotenv.config();
 
 const app = express();
-app.use(cors());
+const cookieParser = require('cookie-parser');
+
+app.use(cors({
+    origin: 'http://localhost:4200',
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
