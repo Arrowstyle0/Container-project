@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api';
+import { CryptoService } from '../../services/crypto';
 
 @Component({
   selector: 'app-settings',
@@ -21,7 +22,12 @@ export class Settings implements OnInit {
   emailVerified = false;
   is2FAEnabled = false;
 
+  showChangePassphrase = false;
+  currentPassphrase = '';
+  newPassphrase = '';
+
   apiService = inject(ApiService);
+  cryptoService = inject(CryptoService);
 
   ngOnInit() {
     this.loadProfile();
@@ -66,6 +72,28 @@ export class Settings implements OnInit {
       this.is2FAEnabled = true;
     } catch (e) {
       alert('Invalid code!');
+    }
+  }
+
+  async changePassphrase() {
+    if (!this.currentPassphrase || !this.newPassphrase) return;
+    try {
+      const currentKeys = await this.cryptoService.deriveKeys(this.currentPassphrase);
+      const newKeys = await this.cryptoService.deriveKeys(this.newPassphrase);
+
+      await this.apiService.changePassphrase(currentKeys.authToken, newKeys.authToken);
+      
+      // Update local keys so user doesn't need to re-login immediately for new files
+      (window as any).encryptionKey = newKeys.encKey;
+      (window as any).hmacKey = newKeys.hmacKey;
+
+      alert('Passphrase changed successfully! Note: Existing files were encrypted with your old passphrase and will no longer be accessible unless you re-upload them.');
+      
+      this.showChangePassphrase = false;
+      this.currentPassphrase = '';
+      this.newPassphrase = '';
+    } catch (e: any) {
+      alert(e.message || 'Failed to change passphrase');
     }
   }
 }

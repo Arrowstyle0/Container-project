@@ -28,7 +28,7 @@
         <div class="form-group">
           <label style="display: flex; justify-content: space-between;">
             {{ isLoginMode ? 'PASSPHRASE' : 'Master Passphrase' }}
-            <a href="#" class="forgot-link" *ngIf="isLoginMode">Forgot passphrase?</a>
+            <a href="javascript:void(0)" class="forgot-link" *ngIf="isLoginMode" (click)="isRecovering = true">Forgot passphrase?</a>
           </label>
           <input type="password" [(ngModel)]="password" name="password" class="input-field" [placeholder]="isLoginMode ? 'Master encryption key' : 'Complex Security Key'" required>
         </div>
@@ -59,15 +59,66 @@
           <label for="stayVerified">Stay verified for 24 hours</label>
         </div>
 
-        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;">
+        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;" *ngIf="!isRecovering && !resetToken">
           {{ isLoginMode ? 'Unlock Vault' : 'Create Secure Vault' }}
         </button>
+      </form>
 
-        <div class="auth-switch">
+      <!-- Recovery Mode / Forgot Password Form -->
+      <form *ngIf="isRecovering && !resetToken" (ngSubmit)="onRecoverySubmit()">
+        <p style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem;">
+          <strong>Warning:</strong> Resetting your passphrase will permanently lock you out of all previously encrypted files (zero-knowledge architecture).
+        </p>
+
+        <div class="form-group" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <button type="button" class="btn-secondary" style="flex: 1; padding: 0.5rem;" [class.active]="recoveryMethod === 'email'" (click)="recoveryMethod = 'email'">Email Reset</button>
+          <button type="button" class="btn-secondary" style="flex: 1; padding: 0.5rem;" [class.active]="recoveryMethod === 'key'" (click)="recoveryMethod = 'key'">Recovery Key</button>
+        </div>
+
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" [(ngModel)]="email" name="email" class="input-field" placeholder="Vault email" required>
+        </div>
+
+        <div class="form-group" *ngIf="recoveryMethod === 'key'">
+          <label>Recovery Key</label>
+          <input type="text" [(ngModel)]="recoveryKeyInput" name="recoveryKeyInput" class="input-field" placeholder="Enter your 24-word or hex recovery key" required>
+        </div>
+
+        <div class="form-group" *ngIf="recoveryMethod === 'key'">
+          <label>New Passphrase</label>
+          <input type="password" [(ngModel)]="password" name="password" class="input-field" placeholder="Enter new master passphrase" required>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;">
+          {{ recoveryMethod === 'email' ? 'Send Reset Link' : 'Reset with Key' }}
+        </button>
+        <div style="text-align: center; margin-top: 1rem;">
+          <a href="javascript:void(0)" (click)="cancelRecovery()" class="text-accent">Back to Login</a>
+        </div>
+      </form>
+
+      <!-- Reset Password via Email Token Form -->
+      <form *ngIf="resetToken" (ngSubmit)="onResetPasswordSubmit()">
+        <p style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem;">
+          <strong>Warning:</strong> Proceeding will completely wipe your old vault access.
+        </p>
+        <div class="form-group">
+          <label>New Passphrase</label>
+          <input type="password" [(ngModel)]="password" name="password" class="input-field" placeholder="Enter new master passphrase" required>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem;">
+          Set New Passphrase
+        </button>
+        <div style="text-align: center; margin-top: 1rem;">
+          <a href="javascript:void(0)" (click)="cancelRecovery()" class="text-accent">Cancel</a>
+        </div>
+      </form>
+
+        <div class="auth-switch" *ngIf="!isRecovering && !resetToken">
           {{ isLoginMode ? 'New agent?' : 'Already have a vault?' }} 
           <a href="javascript:void(0)" (click)="toggleMode()" class="text-accent">{{ isLoginMode ? 'Create an account' : 'Sign in' }}</a>
         </div>
-      </form>
     </div>
     
     <div *ngIf="recoveryKey" class="recovery-box">

@@ -25,6 +25,14 @@ export class Files implements OnInit {
   cryptoService = inject(CryptoService);
   router = inject(Router);
 
+  searchSubscription: any;
+  
+  // Media Player State
+  selectedMedia: { name: string, url: string, type: 'video' | 'audio' } | null = null;
+  isBuffering = false;
+  abortController: AbortController | null = null;
+  toastMessage: string | null = null;
+
   ngOnInit() {
     if (!localStorage.getItem('token') || !(window as any).encryptionKey) {
       this.router.navigate(['/auth']);
@@ -32,15 +40,36 @@ export class Files implements OnInit {
     }
     this.loadFiles();
     this.checkParentStatus();
+
+    this.searchSubscription = this.apiService.searchQuery.subscribe(async (query: string) => {
+      if (!query.trim()) {
+        this.files = [...this.allFiles];
+        return;
+      }
+      try {
+        const key = (window as any).hmacKey;
+        if (!key) return;
+        const blindIndex = await this.cryptoService.generateBlindIndex(query.trim(), key);
+        this.files = await this.apiService.searchFiles(blindIndex);
+      } catch (e) {
+        console.error('Search failed', e);
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.searchSubscription) {
+      this.searchSubscription.unsubscribe();
+    }
   }
 
   async checkParentStatus() {
     try {
-      const devices = await this.apiService.getDevices();
-      const myDeviceId = localStorage.getItem('deviceId');
-      if (myDeviceId && Array.isArray(devices)) {
-        const myDevice = devices.find((d: any) => d.deviceId === myDeviceId);
-        this.isParentDevice = myDevice?.isParent || false;
+      const devices: any[] = await this.apiService.getDevices();
+      const currentDeviceId = localStorage.getItem('deviceId');
+      if (currentDeviceId) {
+        const myDevice = devices.find((d: any) => d.deviceId === currentDeviceId);
+        this.isParentDevice = myDevice?.isParent === true;
       }
     } catch (e) {
       console.error('Failed to check parent status', e);
@@ -85,18 +114,21 @@ export class Files implements OnInit {
 
     try {
       const key = (window as any).encryptionKey;
-      if (!key) {
+      const hmacKey = (window as any).hmacKey;
+      if (!key || !hmacKey) {
         alert('Encryption key not found. Please log in again.');
         this.router.navigate(['/auth']);
         return;
       }
       const { ciphertextBlob, iv, salt } = await this.cryptoService.encryptFile(file, key);
+      const blindIndex = await this.cryptoService.generateBlindIndex(file.name, hmacKey);
 
       await this.apiService.uploadFile({
         filename: file.name,
         fileData: ciphertextBlob,
         iv,
-        salt
+        salt,
+        blindIndex
       }, (percent) => {
         this.uploadProgress = percent;
       });
@@ -120,7 +152,7 @@ export class Files implements OnInit {
       const keyHex = Array.prototype.map.call(new Uint8Array(rawKey), x => ('00' + x.toString(16)).slice(-2)).join('');
       const shareUrl = `${window.location.origin}/share/${file._id}#${keyHex}`;
       await navigator.clipboard.writeText(shareUrl);
-      alert('Secure share link copied to clipboard!');
+      this.showToast('Secure share link copied to clipboard!');
     } catch (e) {
       console.error(e);
       alert('Failed to generate share link');
@@ -129,15 +161,10 @@ export class Files implements OnInit {
 
   async downloadFile(id: string) {
     try {
-      const data = await this.apiService.downloadFile(id);
+      const data = await this.apiService.downloadFileRaw(id);
       const key = (window as any).encryptionKey;
 
-      if (data.error) {
-        alert('Server Error: ' + data.error);
-        return;
-      }
-
-      const plaintextBuffer = await this.cryptoService.decryptFile(data.ciphertext, data.iv, key);
+      const plaintextBuffer = await this.cryptoService.decryptFile(data.blob, data.iv, key);
 
       const blob = new Blob([plaintextBuffer]);
       const url = window.URL.createObjectURL(blob);
@@ -155,15 +182,67 @@ export class Files implements OnInit {
   async deleteFile(id: string) {
     if (!confirm('Are you sure you want to delete this file?')) return;
     try {
-      const result = await this.apiService.deleteFile(id);
-      if (result.error) {
-        alert(result.error);
-        return;
-      }
+      await this.apiService.deleteFile(id);
       this.loadFiles();
     } catch (e: any) {
       console.error(e);
-      alert(e.message || 'Only parent devices can delete files.');
+      alert(e.message || 'Failed to delete file');
+    }
+  }
+
+  isMediaFile(filename: string): boolean {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    return ['mp4', 'webm', 'ogg', 'mp3', 'wav'].includes(ext || '');
+  }
+
+  cancelBuffering() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    this.isBuffering = false;
+  }
+
+  showToast(message: string) {
+    this.toastMessage = message;
+    setTimeout(() => {
+      this.toastMessage = null;
+    }, 3000);
+  }
+
+  async playMedia(file: any) {
+    this.isBuffering = true;
+    this.abortController = new AbortController();
+    try {
+      const data = await this.apiService.downloadFileRaw(file._id, this.abortController.signal);
+      const key = (window as any).encryptionKey;
+
+      const plaintextBuffer = await this.cryptoService.decryptFile(data.blob, data.iv, key);
+      const blob = new Blob([plaintextBuffer]);
+      const url = window.URL.createObjectURL(blob);
+      
+      const ext = file.filename.split('.').pop()?.toLowerCase();
+      const type = ['mp3', 'wav', 'ogg'].includes(ext) ? 'audio' : 'video';
+
+      this.selectedMedia = { name: file.filename, url, type };
+      this.showToast('Media is ready to play!');
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.message?.includes('aborted')) {
+        console.log('Buffering aborted');
+      } else {
+        console.error(e);
+        alert('Failed to buffer media. File may be corrupted or keys are missing.');
+      }
+    } finally {
+      this.isBuffering = false;
+      this.abortController = null;
+    }
+  }
+
+  closeMedia() {
+    if (this.selectedMedia) {
+      window.URL.revokeObjectURL(this.selectedMedia.url);
+      this.selectedMedia = null;
     }
   }
 

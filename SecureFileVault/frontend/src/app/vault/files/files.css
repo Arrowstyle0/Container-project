@@ -17,7 +17,13 @@
 .file-card {
   display: flex;
   flex-direction: column;
-  transition: background-color 0.3s, border-color 0.3s;
+  transition: all 0.3s ease;
+}
+
+.file-card:hover {
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+  border-color: rgba(0, 242, 255, 0.4);
+  transform: translateY(-2px);
 }
 
 .card-header {
@@ -99,8 +105,9 @@
 }
 
 .action-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
+  color: var(--primary-accent);
+  border-color: var(--primary-accent);
+  background: rgba(0, 242, 255, 0.1);
 }
 
 .empty-state {
@@ -110,16 +117,22 @@
 }
 
 .upload-zone {
-  border: 2px dashed var(--border-color);
+  border: 2px dashed rgba(0, 242, 255, 0.4);
   background: transparent;
   text-align: center;
   padding: 4rem 2rem;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+}
+
+.upload-zone:hover {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.1) inset;
 }
 
 .upload-zone.drag-over {
   border-color: var(--primary-accent);
-  background: var(--badge-green-bg);
+  background: rgba(0, 242, 255, 0.05);
+  box-shadow: 0 0 30px rgba(0, 242, 255, 0.2) inset;
 }
 
 .progress-bar-container {

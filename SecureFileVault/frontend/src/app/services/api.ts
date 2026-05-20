@@ -1,9 +1,11 @@
 import { Injectable } from '@angular/core';
+import { Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
+  public searchQuery = new Subject<string>();
   private apiUrl = 'http://localhost:5000/api';
 
   constructor() { }
@@ -65,7 +67,17 @@ export class ApiService {
     return res.json();
   }
 
-  async uploadFile(fileParams: { filename: string, fileData: Blob, iv: string, salt: string }, onProgress?: (percent: number) => void) {
+  async changePassphrase(currentClientHashedAuthToken: string, newClientHashedAuthToken: string) {
+    const res = await fetch(`${this.apiUrl}/auth/change-passphrase`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ currentClientHashedAuthToken, newClientHashedAuthToken }),
+      credentials: 'include'
+    });
+    return res.json();
+  }
+
+  async uploadFile(fileParams: { filename: string, fileData: Blob, iv: string, salt: string, blindIndex?: string }, onProgress?: (percent: number) => void) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${this.apiUrl}/files/upload`, true);
@@ -78,6 +90,9 @@ export class ApiService {
       xhr.setRequestHeader('X-File-Name', encodeURIComponent(fileParams.filename));
       xhr.setRequestHeader('X-File-Iv', fileParams.iv);
       xhr.setRequestHeader('X-File-Salt', fileParams.salt);
+      if (fileParams.blindIndex) {
+        xhr.setRequestHeader('X-Blind-Index', fileParams.blindIndex);
+      }
       // We are streaming, backend needs Content-Length, which XHR sends automatically based on Blob size
 
       if (onProgress) {
@@ -109,6 +124,13 @@ export class ApiService {
     return res.json();
   }
 
+  async searchFiles(blindIndex: string) {
+    const res = await fetch(`${this.apiUrl}/files/search?q=${encodeURIComponent(blindIndex)}`, {
+      headers: this.getHeaders()
+    });
+    return res.json();
+  }
+
   async downloadFile(id: string) {
     const res = await fetch(`${this.apiUrl}/files/${id}/download`, {
       headers: this.getHeaders()
@@ -116,20 +138,47 @@ export class ApiService {
     return res.json();
   }
 
+  async downloadFileRaw(id: string, signal?: AbortSignal): Promise<{ blob: Blob, iv: string, salt: string, filename: string }> {
+    const res = await fetch(`${this.apiUrl}/files/${id}/download-raw`, {
+      headers: this.getHeaders(),
+      signal
+    });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    return {
+      blob,
+      iv: res.headers.get('X-File-Iv') || '',
+      salt: res.headers.get('X-File-Salt') || '',
+      filename: decodeURIComponent(res.headers.get('X-File-Name') || '')
+    };
+  }
+
   async deleteFile(id: string) {
+    const headers = this.getHeaders();
+    const deviceId = localStorage.getItem('deviceId');
+    if (deviceId) headers.append('X-Device-Id', deviceId);
+
     const res = await fetch(`${this.apiUrl}/files/${id}`, {
       method: 'DELETE',
-      headers: this.getHeaders()
+      headers
     });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
   }
 
   async deleteAllFiles() {
+    const headers = this.getHeaders();
+    const deviceId = localStorage.getItem('deviceId');
+    if (deviceId) headers.append('X-Device-Id', deviceId);
+
     const res = await fetch(`${this.apiUrl}/files/all`, {
       method: 'DELETE',
-      headers: this.getHeaders()
+      headers
     });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
   }
 
   async getDevices() {

@@ -28,6 +28,7 @@
       
       <div class="file-footer">
         <div class="actions">
+          <button class="action-btn" *ngIf="isMediaFile(file.filename)" (click)="playMedia(file)">Play</button>
           <button class="action-btn" (click)="shareFile(file)">Share</button>
           <button class="action-btn" (click)="downloadFile(file._id)">Download</button>
         </div>
@@ -61,5 +62,62 @@
       <div class="progress-bar" [style.width]="uploadProgress + '%'"></div>
     </div>
     <p>Encrypting & Uploading... {{ uploadProgress.toFixed(0) }}%</p>
+  </div>
+</div>
+
+<!-- Buffering Notification -->
+<div class="buffering-toast" *ngIf="isBuffering">
+  <div class="spinner" style="width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+  <span style="color: white; font-size: 0.9rem;">Buffering & Decrypting...</span>
+  <button class="icon-btn" (click)="cancelBuffering()" style="color: white; margin-left: auto;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
+</div>
+
+<!-- Generic Toast Notification -->
+<div class="generic-toast" *ngIf="toastMessage" [class.show]="toastMessage">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+  <span style="color: white; font-size: 0.9rem;">{{ toastMessage }}</span>
+</div>
+
+<style>
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .buffering-toast, .generic-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .generic-toast {
+    bottom: 80px; /* Above the buffering toast if both are visible */
+    border-left: 4px solid #10b981;
+    animation: slideIn 0.3s ease-out;
+  }
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+</style>
+
+<!-- Media Player Modal -->
+<div class="modal-overlay" *ngIf="selectedMedia" (click)="closeMedia()" style="z-index: 900;">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 800px; width: 90%; background: #000; padding: 1rem; border-radius: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0; color: white;">{{ selectedMedia.name }}</h3>
+      <button class="action-btn" (click)="closeMedia()" style="color: white; border: 1px solid white;">Close</button>
+    </div>
+    
+    <div style="width: 100%; display: flex; justify-content: center; background: #000;">
+      <video *ngIf="selectedMedia.type === 'video'" [src]="selectedMedia.url" controls autoplay style="max-width: 100%; max-height: 70vh; outline: none; border-radius: 8px;"></video>
+      <audio *ngIf="selectedMedia.type === 'audio'" [src]="selectedMedia.url" controls autoplay style="width: 100%; outline: none; margin: 2rem 0;"></audio>
+    </div>
   </div>
 </div>

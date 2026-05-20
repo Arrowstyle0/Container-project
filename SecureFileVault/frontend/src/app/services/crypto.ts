@@ -18,7 +18,7 @@ export class CryptoService {
     );
   }
 
-  async deriveKeys(password: string): Promise<{ authToken: string, encKey: CryptoKey }> {
+  async deriveKeys(password: string): Promise<{ authToken: string, encKey: CryptoKey, hmacKey: CryptoKey }> {
     const argon2 = (window as any).argon2;
     // Auth Token via Argon2
     const authRes = await argon2.hash({
@@ -50,7 +50,22 @@ export class CryptoService {
       ["encrypt", "decrypt"]
     );
 
-    return { authToken, encKey: masterEncKey };
+    const hmacKey = await window.crypto.subtle.importKey(
+      "raw",
+      encRes.hash,
+      { name: "HMAC", hash: "SHA-256" },
+      true,
+      ["sign"]
+    );
+
+    return { authToken, encKey: masterEncKey, hmacKey };
+  }
+
+  async generateBlindIndex(filename: string, key: CryptoKey): Promise<string> {
+    const enc = new TextEncoder();
+    const data = enc.encode(filename.toLowerCase());
+    const signature = await window.crypto.subtle.sign("HMAC", key, data);
+    return this.buf2hex(signature);
   }
 
   async encryptFile(file: File, key: CryptoKey): Promise<{ ciphertextBlob: Blob, iv: string, salt: string }> {

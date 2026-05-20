@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { ThemeService } from '../services/theme.service';
+import { ApiService } from '../services/api';
 
 @Component({
   selector: 'app-layout',
@@ -13,7 +14,17 @@ import { ThemeService } from '../services/theme.service';
 export class Layout {
   router = inject(Router);
   themeService = inject(ThemeService);
+  apiService = inject(ApiService);
   sidebarOpen = false;
+  searchTimeout: any;
+
+  onSearch(event: Event) {
+    const query = (event.target as HTMLInputElement).value;
+    if (this.searchTimeout) clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+      this.apiService.searchQuery.next(query);
+    }, 300);
+  }
 
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;

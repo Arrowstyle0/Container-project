@@ -6,6 +6,7 @@ const { authenticator } = require('otplib');
 const qrcode = require('qrcode');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
+const emailService = require('../services/emailService');
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -15,8 +16,12 @@ const loginLimiter = rateLimit({
 
 const router = express.Router();
 
-const generateTokens = (user, res, deviceId) => {
-    const accessToken = jwt.sign({ id: user._id, email: user.email, deviceId: deviceId || null }, process.env.JWT_SECRET || 'secret', { expiresIn: '15m' });
+const generateTokens = (user, res, isDuress = false) => {
+    const accessToken = jwt.sign(
+        { id: user._id, email: user.email, isDuress },
+        process.env.JWT_SECRET || 'secret',
+        { expiresIn: '15m' }
+    );
     const refreshToken = crypto.randomBytes(40).toString('hex');
     
     user.refreshToken = refreshToken;
@@ -25,16 +30,31 @@ const generateTokens = (user, res, deviceId) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     return accessToken;
 };
 
+// Auth Middleware
+const authenticate = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+// ========================
 // Signup
+// ========================
 router.post('/signup', async (req, res) => {
     try {
-        const { name, dob, email, clientHashedAuthToken } = req.body;
+        const { name, dob, email, clientHashedAuthToken, mnemonicHash } = req.body;
         
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'User already exists' });
@@ -45,13 +65,20 @@ router.post('/signup', async (req, res) => {
         const recoveryKey = crypto.randomBytes(32).toString('hex');
         const hashedRecoveryKey = await bcrypt.hash(recoveryKey, 10);
 
+        // If mnemonic hash provided, store it
+        let recoveryMnemonicHash = null;
+        if (mnemonicHash) {
+            recoveryMnemonicHash = await bcrypt.hash(mnemonicHash, 10);
+        }
+
         const newUser = new User({
             name,
             dob,
             email,
             hashedAuthToken,
             queryableAuthHash,
-            hashedRecoveryKey
+            hashedRecoveryKey,
+            recoveryMnemonicHash
         });
 
         await newUser.save();
@@ -63,16 +90,20 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-// Login
+// ========================
+// Login (with Duress detection)
+// ========================
 router.post('/login', loginLimiter, async (req, res) => {
     try {
-        const { clientHashedAuthToken, deviceId, deviceName, totpCode } = req.body;
+        const { email, clientHashedAuthToken, deviceId, deviceName, totpCode } = req.body;
 
-        const queryableAuthHash = crypto.createHash('sha256').update(clientHashedAuthToken).digest('hex');
-        const user = await User.findOne({ queryableAuthHash });
+        // Find user by email
+        let user = await User.findOne({ email });
+        let isDuress = false;
         
         if (!user) return res.status(400).json({ error: 'Invalid credentials' });
 
+        // Check if this device is a registered parent device
         let isParentDevice = false;
         if (deviceId) {
             const device = user.trustedDevices.find(d => d.deviceId === deviceId);
@@ -81,26 +112,50 @@ router.post('/login', loginLimiter, async (req, res) => {
             }
         }
 
-        if (user.lockoutUntil && user.lockoutUntil > new Date() && !isParentDevice) {
-            return res.status(403).json({ error: 'Account temporarily locked due to too many failed attempts from unrecognized devices. Please try again later.' });
+        // If account is permanently locked, only parent devices can log in (not duress)
+        if (user.permanentLockout && !isParentDevice && !isDuress) {
+            return res.status(403).json({ 
+                error: 'Account permanently locked due to too many failed attempts from unrecognized devices. Only parent devices can access this vault.',
+                permanentLockout: true 
+            });
         }
 
-        const isMatch = await bcrypt.compare(clientHashedAuthToken, user.hashedAuthToken);
+        // Verify password
+        let isMatch = await bcrypt.compare(clientHashedAuthToken, user.hashedAuthToken);
+        
+        if (!isMatch && user.hashedDuressAuthToken) {
+            const isDuressMatch = await bcrypt.compare(clientHashedAuthToken, user.hashedDuressAuthToken);
+            if (isDuressMatch) {
+                isMatch = true;
+                isDuress = true;
+            }
+        }
+
         if (!isMatch) {
-            if (!isParentDevice) {
+            if (!isParentDevice && !isDuress) {
                 user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+                
                 if (user.failedLoginAttempts >= 5) {
-                    const lockoutTime = new Date();
-                    lockoutTime.setMinutes(lockoutTime.getMinutes() + 15);
-                    user.lockoutUntil = lockoutTime;
+                    user.permanentLockout = true;
                 }
                 await user.save();
+
+                const remaining = Math.max(0, 5 - user.failedLoginAttempts);
+                if (user.permanentLockout) {
+                    return res.status(403).json({ 
+                        error: 'Account permanently locked. Only parent devices can access this vault.',
+                        permanentLockout: true
+                    });
+                }
+                return res.status(400).json({ 
+                    error: `Invalid credentials. ${remaining} attempt(s) remaining before permanent lockout.` 
+                });
             }
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
-        // Check 2FA
-        if (user.isTwoFactorEnabled) {
+        // Check 2FA (skip for duress — duress should bypass 2FA for plausibility)
+        if (user.isTwoFactorEnabled && !isDuress) {
             if (!totpCode) {
                 return res.json({ require2FA: true, message: '2FA code required' });
             }
@@ -108,28 +163,161 @@ router.post('/login', loginLimiter, async (req, res) => {
             if (!isValid) return res.status(400).json({ error: 'Invalid 2FA code' });
         }
 
+        // Register or update device
         if (deviceId) {
             const deviceIndex = user.trustedDevices.findIndex(d => d.deviceId === deviceId);
             if (deviceIndex >= 0) {
                 user.trustedDevices[deviceIndex].lastUsed = new Date();
             } else {
-                user.trustedDevices.push({ deviceId, deviceName });
+                if (!user.permanentLockout) {
+                    user.trustedDevices.push({ deviceId, deviceName });
+                }
             }
         }
 
-        user.failedLoginAttempts = 0;
-        user.lockoutUntil = null;
-        const token = generateTokens(user, res, deviceId);
+        // Successful login: reset failed attempts
+        if (!isDuress) {
+            user.failedLoginAttempts = 0;
+            if (isParentDevice) {
+                user.permanentLockout = false;
+            }
+            user.lockoutUntil = null;
+
+            // Dead Man's Switch check-in
+            if (user.deadManSwitch && user.deadManSwitch.enabled) {
+                user.deadManSwitch.lastCheckIn = new Date();
+                user.deadManSwitch.triggered = false;
+            }
+        }
+
+        const token = generateTokens(user, res, isDuress);
         await user.save();
         
-        res.json({ token, message: 'Logged in successfully' });
+        res.json({ token, message: 'Logged in successfully', isDuress });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
+// ========================
+// Recovery via Mnemonic
+// ========================
+router.post('/recover', async (req, res) => {
+    try {
+        const { email, mnemonicHash, newClientHashedAuthToken } = req.body;
+        
+        const user = await User.findOne({ email });
+        if (!user || !user.recoveryMnemonicHash) {
+            return res.status(400).json({ error: 'Recovery not available for this account' });
+        }
+
+        const isValid = await bcrypt.compare(mnemonicHash, user.recoveryMnemonicHash);
+        if (!isValid) {
+            return res.status(400).json({ error: 'Invalid recovery phrase' });
+        }
+
+        // Reset password
+        user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
+        user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        user.failedLoginAttempts = 0;
+        user.permanentLockout = false;
+        user.lockoutUntil = null;
+        await user.save();
+
+        res.json({ message: 'Account recovered. You can now login with your new passphrase.' });
+    } catch (error) {
+        console.error('Recovery error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ========================
+// Forgot Password (Email)
+// ========================
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) {
+            // Return success even if user not found to prevent email enumeration
+            return res.json({ message: 'If that email exists, a reset link has been sent.' });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+        await user.save();
+        await emailService.sendPasswordResetEmail(user.email, resetToken);
+
+        res.json({ message: 'If that email exists, a reset link has been sent.' });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ========================
+// Reset Password (Email)
+// ========================
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { token, newClientHashedAuthToken } = req.body;
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Password reset token is invalid or has expired.' });
+        }
+
+        user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
+        user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        user.failedLoginAttempts = 0;
+        user.permanentLockout = false;
+        user.lockoutUntil = null;
+
+        await user.save();
+        res.json({ message: 'Passphrase has been successfully reset. You may now log in.' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ========================
+// Change Passphrase
+// ========================
+router.post('/change-passphrase', authenticate, async (req, res) => {
+    try {
+        const { currentClientHashedAuthToken, newClientHashedAuthToken } = req.body;
+        
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const isMatch = await bcrypt.compare(currentClientHashedAuthToken, user.hashedAuthToken);
+        if (!isMatch) return res.status(400).json({ error: 'Current passphrase is incorrect' });
+
+        user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
+        user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        await user.save();
+
+        res.json({ message: 'Passphrase changed successfully.' });
+    } catch (error) {
+        console.error('Change passphrase error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ========================
 // Refresh Token
+// ========================
 router.post('/refresh', async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -147,7 +335,9 @@ router.post('/refresh', async (req, res) => {
     }
 });
 
+// ========================
 // Logout
+// ========================
 router.post('/logout', async (req, res) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -165,20 +355,9 @@ router.post('/logout', async (req, res) => {
     }
 });
 
-// Auth Middleware for 2FA routes
-const authenticate = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
-
-    jwt.verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
-};
-
-// Generate 2FA
+// ========================
+// 2FA
+// ========================
 router.post('/2fa/generate', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -195,7 +374,6 @@ router.post('/2fa/generate', authenticate, async (req, res) => {
     }
 });
 
-// Enable 2FA
 router.post('/2fa/enable', authenticate, async (req, res) => {
     try {
         const { totpCode } = req.body;
@@ -213,7 +391,9 @@ router.post('/2fa/enable', authenticate, async (req, res) => {
     }
 });
 
-// Get Devices
+// ========================
+// Devices
+// ========================
 router.get('/devices', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -223,7 +403,6 @@ router.get('/devices', authenticate, async (req, res) => {
     }
 });
 
-// Set Parent Device
 router.post('/devices/:deviceId/set-parent', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -245,7 +424,6 @@ router.post('/devices/:deviceId/set-parent', authenticate, async (req, res) => {
     }
 });
 
-// Remove Parent Device
 router.post('/devices/:deviceId/remove-parent', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -260,7 +438,82 @@ router.post('/devices/:deviceId/remove-parent', authenticate, async (req, res) =
     }
 });
 
-// Get User Profile (recovery email)
+// ========================
+// Duress Passphrase
+// ========================
+router.post('/duress/setup', authenticate, async (req, res) => {
+    try {
+        const { clientHashedDuressToken } = req.body;
+        const user = await User.findById(req.user.id);
+
+        user.duressAuthHash = crypto.createHash('sha256').update(clientHashedDuressToken).digest('hex');
+        user.hashedDuressAuthToken = await bcrypt.hash(clientHashedDuressToken, 10);
+        await user.save();
+
+        res.json({ message: 'Duress passphrase configured successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to setup duress passphrase' });
+    }
+});
+
+router.get('/duress/status', authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        res.json({ hasDuress: !!user.duressAuthHash });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to check duress status' });
+    }
+});
+
+// ========================
+// Dead Man's Switch
+// ========================
+router.post('/dead-man/configure', authenticate, async (req, res) => {
+    try {
+        const { enabled, intervalDays, beneficiaries } = req.body;
+        const user = await User.findById(req.user.id);
+
+        user.deadManSwitch = {
+            enabled: enabled !== undefined ? enabled : user.deadManSwitch?.enabled,
+            intervalDays: intervalDays || user.deadManSwitch?.intervalDays || 30,
+            lastCheckIn: new Date(),
+            beneficiaries: beneficiaries || user.deadManSwitch?.beneficiaries || [],
+            triggered: false
+        };
+        await user.save();
+
+        res.json({ message: 'Dead Man\'s Switch configured', deadManSwitch: user.deadManSwitch });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to configure Dead Man\'s Switch' });
+    }
+});
+
+router.post('/dead-man/check-in', authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (user.deadManSwitch) {
+            user.deadManSwitch.lastCheckIn = new Date();
+            user.deadManSwitch.triggered = false;
+            await user.save();
+        }
+        res.json({ message: 'Check-in recorded', lastCheckIn: new Date() });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to check in' });
+    }
+});
+
+router.get('/dead-man/status', authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        res.json(user.deadManSwitch || { enabled: false });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get status' });
+    }
+});
+
+// ========================
+// Profile
+// ========================
 router.get('/profile', authenticate, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -268,7 +521,9 @@ router.get('/profile', authenticate, async (req, res) => {
             email: user.email,
             name: user.name,
             emailVerified: user.emailVerified,
-            isTwoFactorEnabled: user.isTwoFactorEnabled
+            isTwoFactorEnabled: user.isTwoFactorEnabled,
+            hasDuress: !!user.duressAuthHash,
+            deadManSwitch: user.deadManSwitch || { enabled: false }
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch profile' });

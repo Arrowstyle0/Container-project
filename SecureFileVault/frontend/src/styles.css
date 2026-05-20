@@ -5,20 +5,20 @@
 /* ========================= */
 :root,
 [data-theme="dark"] {
-  --bg-dark: #0b101e;
-  --bg-card: #151b2b;
-  --bg-card-hover: #1e2538;
-  --primary-accent: #5de49c;
-  --primary-accent-hover: #4ade80;
+  --bg-dark: #0a0b10;
+  --bg-card: #12141f;
+  --bg-card-hover: #1a1d2e;
+  --primary-accent: #00f2ff;
+  --primary-accent-hover: #00d5e6;
   --blue-accent: #3b82f6;
   --blue-accent-hover: #2563eb;
   --text-primary: #ffffff;
   --text-secondary: #94a3b8;
   --border-color: #1e293b;
   --danger: #ef4444;
-  --input-bg: #0b101e;
-  --shadow-color: rgba(0,0,0,0.4);
-  --badge-green-bg: rgba(74, 222, 128, 0.1);
+  --input-bg: #0a0b10;
+  --shadow-color: rgba(0,0,0,0.6);
+  --badge-green-bg: rgba(0, 242, 255, 0.1);
   --badge-blue-bg: rgba(59, 130, 246, 0.1);
 }
 

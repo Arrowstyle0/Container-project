@@ -42,8 +42,19 @@
         <span></span><span></span><span></span>
       </button>
       <div class="search-bar">
-        <input type="text" placeholder="Search your vault..." class="search-input">
+        <input type="text" placeholder="Search your vault..." class="search-input" (input)="onSearch($event)">
       </div>
+      <div class="encryption-status" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--primary-accent); margin-right: auto; margin-left: 20px; font-weight: 500;">
+        <span class="status-dot" style="width: 8px; height: 8px; background-color: var(--primary-accent); border-radius: 50%; box-shadow: 0 0 8px var(--primary-accent); animation: pulse 2s infinite;"></span>
+        Encryption Status: Active
+      </div>
+<style>
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+</style>
       <div class="topbar-actions">
         <button class="theme-toggle" (click)="toggleTheme()" [title]="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
           <svg *ngIf="isDark" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>

@@ -10,7 +10,7 @@
   <div class="settings-card card">
     <div class="card-label">MASTER PASSPHRASE</div>
     <p style="margin: 0 0 1.5rem 0;">Last changed 42 days ago.</p>
-    <button class="btn-primary" style="font-size: 0.85rem;">Change passphrase</button>
+    <button class="btn-primary" style="font-size: 0.85rem;" (click)="showChangePassphrase = true">Change passphrase</button>
   </div>
   
   <div class="settings-card card">
@@ -76,6 +76,25 @@
     <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
       <button class="btn-primary" style="flex: 1; min-width: 120px;" (click)="confirm2FA()">Verify & Enable</button>
       <button class="btn-secondary" style="flex: 1; min-width: 120px;" (click)="show2FASetup = false">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" *ngIf="showChangePassphrase">
+  <div class="modal-content">
+    <h3>Change Master Passphrase</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Warning: Changing your master passphrase will change your encryption key. Existing files will no longer be readable unless re-uploaded.</p>
+    
+    <div style="margin-bottom: 1rem;">
+      <input type="password" placeholder="Current Passphrase" [(ngModel)]="currentPassphrase" class="input-field" style="width: 100%;">
+    </div>
+    <div style="margin-bottom: 1.5rem;">
+      <input type="password" placeholder="New Passphrase" [(ngModel)]="newPassphrase" class="input-field" style="width: 100%;">
+    </div>
+
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      <button class="btn-primary" style="flex: 1; min-width: 120px;" (click)="changePassphrase()">Change Passphrase</button>
+      <button class="btn-secondary" style="flex: 1; min-width: 120px;" (click)="showChangePassphrase = false">Cancel</button>
     </div>
   </div>
 </div>
