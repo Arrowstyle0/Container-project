@@ -1,14 +1,14 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../services/api';
 import { CryptoService } from '../services/crypto';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './auth.html',
   styleUrls: ['./auth.css']
 })
@@ -68,7 +68,7 @@ export class Auth implements OnInit {
   async login() {
     if (!this.password) return;
     try {
-      const keys = await this.cryptoService.deriveKeys(this.password);
+      const { kek, authToken } = await this.cryptoService.generateKekAndAuthToken(this.password);
       
       let deviceId = localStorage.getItem('deviceId');
       if (!deviceId) {
@@ -76,7 +76,7 @@ export class Auth implements OnInit {
         localStorage.setItem('deviceId', deviceId);
       }
 
-      const data = await this.apiService.login(this.email, keys.authToken, deviceId, this.totpCode);
+      const data = await this.apiService.login(this.email, authToken, deviceId, this.totpCode);
 
       if (data.require2FA) {
         this.show2FAInput = true;
@@ -84,8 +84,12 @@ export class Auth implements OnInit {
       }
 
       if (data.token) {
-        (window as any).encryptionKey = keys.encKey; 
-        (window as any).hmacKey = keys.hmacKey;
+        if (!data.encryptedMasterKey || !data.masterKeyIV) {
+          throw new Error('E2EE Master Key wrapping metadata missing from server response.');
+        }
+        const unwrapped = await this.cryptoService.unwrapMasterKey(kek, data.encryptedMasterKey, data.masterKeyIV);
+        (window as any).encryptionKey = unwrapped.masterEncKey; 
+        (window as any).hmacKey = unwrapped.hmacKey;
         this.router.navigate(['/vault']);
       } else {
         alert('Error: ' + data.error);
@@ -99,11 +103,20 @@ export class Auth implements OnInit {
   async signup() {
     if (!this.email || !this.password) return;
     try {
-      const keys = await this.cryptoService.deriveKeys(this.password);
+      const { kek, authToken } = await this.cryptoService.generateKekAndAuthToken(this.password);
+      const { encryptedMasterKey, masterKeyIV } = await this.cryptoService.generateAndWrapMasterKey(kek);
+      
       const res = await fetch('http://localhost:5000/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: this.name, dob: this.dob || new Date().toISOString(), email: this.email, clientHashedAuthToken: keys.authToken })
+        body: JSON.stringify({ 
+          name: this.name, 
+          dob: this.dob || new Date().toISOString(), 
+          email: this.email, 
+          clientHashedAuthToken: authToken,
+          encryptedMasterKey,
+          masterKeyIV
+        })
       });
       const data = await res.json();
       
@@ -136,14 +149,17 @@ export class Auth implements OnInit {
     } else {
       if (!this.email || !this.recoveryKeyInput || !this.password) return;
       try {
-        const keys = await this.cryptoService.deriveKeys(this.password);
+        const { kek, authToken } = await this.cryptoService.generateKekAndAuthToken(this.password);
+        const { encryptedMasterKey, masterKeyIV } = await this.cryptoService.generateAndWrapMasterKey(kek);
         const res = await fetch('http://localhost:5000/api/auth/recover', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: this.email,
             mnemonicHash: this.recoveryKeyInput,
-            newClientHashedAuthToken: keys.authToken
+            newClientHashedAuthToken: authToken,
+            encryptedMasterKey,
+            masterKeyIV
           })
         });
         const data = await res.json();
@@ -162,13 +178,16 @@ export class Auth implements OnInit {
   async onResetPasswordSubmit() {
     if (!this.password || !this.resetToken) return;
     try {
-      const keys = await this.cryptoService.deriveKeys(this.password);
+      const { kek, authToken } = await this.cryptoService.generateKekAndAuthToken(this.password);
+      const { encryptedMasterKey, masterKeyIV } = await this.cryptoService.generateAndWrapMasterKey(kek);
       const res = await fetch('http://localhost:5000/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: this.resetToken,
-          newClientHashedAuthToken: keys.authToken
+          newClientHashedAuthToken: authToken,
+          encryptedMasterKey,
+          masterKeyIV
         })
       });
       const data = await res.json();

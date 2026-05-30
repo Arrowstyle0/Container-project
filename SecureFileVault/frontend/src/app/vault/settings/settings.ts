@@ -54,6 +54,12 @@ export class Settings implements OnInit {
     }
   }
 
+  /** Called by layout's (activate) event on every navigation to this route */
+  refresh() {
+    this.loadProfile();
+    this.loadDevices();
+  }
+
   async open2FASetup() {
     try {
       const data = await this.apiService.setup2FA();
@@ -78,21 +84,43 @@ export class Settings implements OnInit {
   async changePassphrase() {
     if (!this.currentPassphrase || !this.newPassphrase) return;
     try {
-      const currentKeys = await this.cryptoService.deriveKeys(this.currentPassphrase);
-      const newKeys = await this.cryptoService.deriveKeys(this.newPassphrase);
+      const currentAuth = await this.cryptoService.generateKekAndAuthToken(this.currentPassphrase);
+      const newAuth = await this.cryptoService.generateKekAndAuthToken(this.newPassphrase);
 
-      await this.apiService.changePassphrase(currentKeys.authToken, newKeys.authToken);
-      
-      // Update local keys so user doesn't need to re-login immediately for new files
-      (window as any).encryptionKey = newKeys.encKey;
-      (window as any).hmacKey = newKeys.hmacKey;
+      const activeMasterKey = (window as any).encryptionKey;
+      if (!activeMasterKey) {
+        throw new Error('Active master key not found in memory. Please log in again.');
+      }
 
-      alert('Passphrase changed successfully! Note: Existing files were encrypted with your old passphrase and will no longer be accessible unless you re-upload them.');
+      // Wrap the existing Master Key using the new KEK
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const wrappedKeyBuffer = await window.crypto.subtle.wrapKey(
+        "raw",
+        activeMasterKey,
+        newAuth.kek,
+        { name: "AES-GCM", iv }
+      );
+
+      const buf2hex = (buffer: ArrayBuffer | Uint8Array) => 
+        Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
+
+      const encryptedMasterKey = buf2hex(wrappedKeyBuffer);
+      const masterKeyIV = buf2hex(iv);
+
+      await this.apiService.changePassphrase(
+        currentAuth.authToken, 
+        newAuth.authToken, 
+        encryptedMasterKey, 
+        masterKeyIV
+      );
+
+      alert('Passphrase changed successfully! Zero-knowledge master key has been securely re-wrapped with your new passphrase. All existing files remain fully accessible.');
       
       this.showChangePassphrase = false;
       this.currentPassphrase = '';
       this.newPassphrase = '';
     } catch (e: any) {
+      console.error(e);
       alert(e.message || 'Failed to change passphrase');
     }
   }

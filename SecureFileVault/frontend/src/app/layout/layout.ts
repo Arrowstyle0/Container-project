@@ -26,6 +26,14 @@ export class Layout {
     }, 300);
   }
 
+  onChildActivate(component: any) {
+    // When a child route component is activated (navigated to),
+    // call its refresh() method if it exists to re-fetch data.
+    if (component && typeof component.refresh === 'function') {
+      component.refresh();
+    }
+  }
+
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
   }
@@ -42,10 +50,10 @@ export class Layout {
     return this.themeService.darkMode;
   }
 
-  logout() {
-    fetch('http://localhost:5000/api/auth/logout', { method: 'POST', credentials: 'include' });
-    localStorage.removeItem('token');
+  async logout() {
+    await this.apiService.logout();
     (window as any).encryptionKey = null;
+    (window as any).hmacKey = null;
     this.router.navigate(['/auth']);
   }
 }

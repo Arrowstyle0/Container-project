@@ -2,19 +2,27 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 3rem;
+  margin-bottom: 2.5rem;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 1.5rem;
   flex-wrap: wrap;
   gap: 1rem;
-  transition: border-color 0.3s;
+}
+
+.settings-header h1 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0;
 }
 
 .section-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.5rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
   margin: 0 0 1.5rem 0;
   color: var(--text-primary);
 }
@@ -27,8 +35,9 @@
 
 .card-label {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 1rem;
 }
@@ -36,15 +45,16 @@
 .recovery-section {
   border: 1px solid var(--border-color);
   border-left: 4px solid var(--danger);
-  transition: border-color 0.3s;
+  box-shadow: 0 10px 25px -10px var(--shadow-color);
 }
 
 .critical-warning {
   color: var(--danger);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   margin-bottom: 1rem;
+  text-transform: uppercase;
 }
 
 .recovery-content {
@@ -61,7 +71,9 @@
   padding: 1rem;
   margin-top: 1.5rem;
   font-family: monospace;
-  transition: background-color 0.3s, border-color 0.3s;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .sessions-header {
@@ -74,6 +86,13 @@
   gap: 1rem;
 }
 
+.sessions-header h2 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
 .sessions-list {
   display: flex;
   flex-direction: column;
@@ -83,20 +102,30 @@
 .session-item {
   display: flex;
   align-items: center;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 1.25rem 1.5rem;
   gap: 1.5rem;
-  transition: background-color 0.3s, border-color 0.3s;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: all 0.2s ease;
+}
+
+.session-item:hover {
+  border-color: var(--primary-accent);
+  box-shadow: 0 8px 16px -4px var(--primary-glow);
 }
 
 .session-icon {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: var(--badge-green-bg);
+  border: 1px solid rgba(0, 242, 255, 0.15);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--primary-accent);
   flex-shrink: 0;
 }
@@ -106,9 +135,15 @@
   min-width: 0;
 }
 
+.session-info strong {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+}
+
 .session-time {
   color: var(--text-secondary);
   font-size: 0.85rem;
+  font-weight: 500;
   white-space: nowrap;
 }
 

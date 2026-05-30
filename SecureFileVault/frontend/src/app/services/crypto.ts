@@ -61,6 +61,111 @@ export class CryptoService {
     return { authToken, encKey: masterEncKey, hmacKey };
   }
 
+  async generateKekAndAuthToken(password: string): Promise<{ kek: CryptoKey, authToken: string }> {
+    const argon2 = (window as any).argon2;
+    // Auth Token via Argon2
+    const authRes = await argon2.hash({
+      pass: password,
+      salt: 'SecureFileVaultAuthSalt123',
+      time: 2,
+      mem: 16384,
+      hashLen: 32,
+      type: argon2.ArgonType.Argon2id
+    });
+    const authToken = authRes.hashHex;
+
+    // Key Encryption Key (KEK) via Argon2 with separate salt
+    const kekRes = await argon2.hash({
+      pass: password,
+      salt: 'SecureFileVaultKekSalt789',
+      time: 2,
+      mem: 16384,
+      hashLen: 32,
+      type: argon2.ArgonType.Argon2id
+    });
+
+    const kek = await window.crypto.subtle.importKey(
+      "raw",
+      kekRes.hash,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["wrapKey", "unwrapKey"]
+    );
+
+    return { kek, authToken };
+  }
+
+  async generateAndWrapMasterKey(kek: CryptoKey): Promise<{ encryptedMasterKey: string, masterKeyIV: string, masterEncKey: CryptoKey, hmacKey: CryptoKey }> {
+    // 1. Generate truly random master key bytes
+    const masterKeyBytes = window.crypto.getRandomValues(new Uint8Array(32));
+
+    // 2. Import as AES-GCM key for file encryption
+    const masterEncKey = await window.crypto.subtle.importKey(
+      "raw",
+      masterKeyBytes,
+      { name: "AES-GCM", length: 256 },
+      true, // must be extractable for wrapKey/exportKey
+      ["encrypt", "decrypt"]
+    );
+
+    // 3. Import as HMAC key for blind indexing
+    const hmacKey = await window.crypto.subtle.importKey(
+      "raw",
+      masterKeyBytes,
+      { name: "HMAC", hash: "SHA-256" },
+      true,
+      ["sign"]
+    );
+
+    // 4. Generate random IV for key wrapping
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+    // 5. Wrap the Master Key with the KEK
+    const wrappedKeyBuffer = await window.crypto.subtle.wrapKey(
+      "raw",
+      masterEncKey,
+      kek,
+      { name: "AES-GCM", iv }
+    );
+
+    return {
+      encryptedMasterKey: this.buf2hex(wrappedKeyBuffer),
+      masterKeyIV: this.buf2hex(iv),
+      masterEncKey,
+      hmacKey
+    };
+  }
+
+  async unwrapMasterKey(kek: CryptoKey, encryptedMasterKeyHex: string, masterKeyIVHex: string): Promise<{ masterEncKey: CryptoKey, hmacKey: CryptoKey }> {
+    const wrappedKeyBuffer = this.hex2buf(encryptedMasterKeyHex) as any;
+    const iv = this.hex2buf(masterKeyIVHex) as any;
+
+    // 1. Unwrap the AES-GCM master key
+    const masterEncKey = await window.crypto.subtle.unwrapKey(
+      "raw",
+      wrappedKeyBuffer,
+      kek,
+      { name: "AES-GCM", iv },
+      { name: "AES-GCM", length: 256 },
+      true, // must be extractable for HMAC import & sharing
+      ["encrypt", "decrypt"]
+    );
+
+    // 2. Export raw bytes to derive HMAC key
+    const rawMasterKey = await window.crypto.subtle.exportKey("raw", masterEncKey);
+
+    // 3. Import as HMAC key
+    const hmacKey = await window.crypto.subtle.importKey(
+      "raw",
+      rawMasterKey,
+      { name: "HMAC", hash: "SHA-256" },
+      true,
+      ["sign"]
+    );
+
+    return { masterEncKey, hmacKey };
+  }
+
   async generateBlindIndex(filename: string, key: CryptoKey): Promise<string> {
     const enc = new TextEncoder();
     const data = enc.encode(filename.toLowerCase());

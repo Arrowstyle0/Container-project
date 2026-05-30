@@ -20,6 +20,8 @@ const UserSchema = new mongoose.Schema({
     hashedAuthToken: { type: String, required: true },
     queryableAuthHash: { type: String, required: true },
     hashedRecoveryKey: { type: String, required: true },
+    encryptedMasterKey: { type: String },
+    masterKeyIV: { type: String },
     encryptedMEK: { type: String }, // Base64 encoded JSON { ciphertext, iv, salt }
     emailVerified: { type: Boolean, default: false },
     trustedDevices: [DeviceSchema],

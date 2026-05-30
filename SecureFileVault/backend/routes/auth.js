@@ -54,10 +54,14 @@ const authenticate = (req, res, next) => {
 // ========================
 router.post('/signup', async (req, res) => {
     try {
-        const { name, dob, email, clientHashedAuthToken, mnemonicHash } = req.body;
+        const { name, dob, email, clientHashedAuthToken, mnemonicHash, encryptedMasterKey, masterKeyIV } = req.body;
         
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'User already exists' });
+
+        if (!encryptedMasterKey || !masterKeyIV) {
+            return res.status(400).json({ error: 'E2EE master key wrapping metadata is required.' });
+        }
 
         const hashedAuthToken = await bcrypt.hash(clientHashedAuthToken, 10);
         const queryableAuthHash = crypto.createHash('sha256').update(clientHashedAuthToken).digest('hex');
@@ -78,7 +82,9 @@ router.post('/signup', async (req, res) => {
             hashedAuthToken,
             queryableAuthHash,
             hashedRecoveryKey,
-            recoveryMnemonicHash
+            recoveryMnemonicHash,
+            encryptedMasterKey,
+            masterKeyIV
         });
 
         await newUser.save();
@@ -193,7 +199,13 @@ router.post('/login', loginLimiter, async (req, res) => {
         const token = generateTokens(user, res, isDuress);
         await user.save();
         
-        res.json({ token, message: 'Logged in successfully', isDuress });
+        res.json({ 
+            token, 
+            message: 'Logged in successfully', 
+            isDuress,
+            encryptedMasterKey: user.encryptedMasterKey,
+            masterKeyIV: user.masterKeyIV
+        });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -205,7 +217,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 // ========================
 router.post('/recover', async (req, res) => {
     try {
-        const { email, mnemonicHash, newClientHashedAuthToken } = req.body;
+        const { email, mnemonicHash, newClientHashedAuthToken, encryptedMasterKey, masterKeyIV } = req.body;
         
         const user = await User.findOne({ email });
         if (!user || !user.recoveryMnemonicHash) {
@@ -220,6 +232,10 @@ router.post('/recover', async (req, res) => {
         // Reset password
         user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
         user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        if (encryptedMasterKey && masterKeyIV) {
+            user.encryptedMasterKey = encryptedMasterKey;
+            user.masterKeyIV = masterKeyIV;
+        }
         user.failedLoginAttempts = 0;
         user.permanentLockout = false;
         user.lockoutUntil = null;
@@ -263,7 +279,7 @@ router.post('/forgot-password', async (req, res) => {
 // ========================
 router.post('/reset-password', async (req, res) => {
     try {
-        const { token, newClientHashedAuthToken } = req.body;
+        const { token, newClientHashedAuthToken, encryptedMasterKey, masterKeyIV } = req.body;
         const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
         const user = await User.findOne({
@@ -277,6 +293,10 @@ router.post('/reset-password', async (req, res) => {
 
         user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
         user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        if (encryptedMasterKey && masterKeyIV) {
+            user.encryptedMasterKey = encryptedMasterKey;
+            user.masterKeyIV = masterKeyIV;
+        }
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         user.failedLoginAttempts = 0;
@@ -296,7 +316,7 @@ router.post('/reset-password', async (req, res) => {
 // ========================
 router.post('/change-passphrase', authenticate, async (req, res) => {
     try {
-        const { currentClientHashedAuthToken, newClientHashedAuthToken } = req.body;
+        const { currentClientHashedAuthToken, newClientHashedAuthToken, encryptedMasterKey, masterKeyIV } = req.body;
         
         const user = await User.findById(req.user.id);
         if (!user) return res.status(404).json({ error: 'User not found' });
@@ -306,6 +326,10 @@ router.post('/change-passphrase', authenticate, async (req, res) => {
 
         user.hashedAuthToken = await bcrypt.hash(newClientHashedAuthToken, 10);
         user.queryableAuthHash = crypto.createHash('sha256').update(newClientHashedAuthToken).digest('hex');
+        if (encryptedMasterKey && masterKeyIV) {
+            user.encryptedMasterKey = encryptedMasterKey;
+            user.masterKeyIV = masterKeyIV;
+        }
         await user.save();
 
         res.json({ message: 'Passphrase changed successfully.' });

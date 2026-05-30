@@ -65,7 +65,7 @@
     </header>
 
     <div class="content-area">
-      <router-outlet></router-outlet>
+      <router-outlet (activate)="onChildActivate($event)"></router-outlet>
     </div>
   </main>
 </div>

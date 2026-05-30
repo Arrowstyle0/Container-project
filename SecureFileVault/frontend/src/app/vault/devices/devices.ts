@@ -29,6 +29,11 @@ export class Devices implements OnInit {
     }
   }
 
+  /** Called by layout's (activate) event on every navigation to this route */
+  refresh() {
+    this.loadDevices();
+  }
+
   async toggleParent(device: any) {
     try {
       if (device.isParent) {

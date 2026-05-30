@@ -19,11 +19,11 @@ export class ApiService {
     return headers;
   }
 
-  async signup(email: string, clientHashedAuthToken: string) {
+  async signup(email: string, clientHashedAuthToken: string, encryptedMasterKey?: string, masterKeyIV?: string) {
     const res = await fetch(`${this.apiUrl}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, clientHashedAuthToken }),
+      body: JSON.stringify({ email, clientHashedAuthToken, encryptedMasterKey, masterKeyIV }),
       credentials: 'include'
     });
     return res.json();
@@ -67,11 +67,11 @@ export class ApiService {
     return res.json();
   }
 
-  async changePassphrase(currentClientHashedAuthToken: string, newClientHashedAuthToken: string) {
+  async changePassphrase(currentClientHashedAuthToken: string, newClientHashedAuthToken: string, encryptedMasterKey?: string, masterKeyIV?: string) {
     const res = await fetch(`${this.apiUrl}/auth/change-passphrase`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ currentClientHashedAuthToken, newClientHashedAuthToken }),
+      body: JSON.stringify({ currentClientHashedAuthToken, newClientHashedAuthToken, encryptedMasterKey, masterKeyIV }),
       credentials: 'include'
     });
     return res.json();

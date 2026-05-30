@@ -85,6 +85,12 @@ export class Files implements OnInit {
     }
   }
 
+  /** Called by layout's (activate) event on every navigation to this route */
+  refresh() {
+    this.loadFiles();
+    this.checkParentStatus();
+  }
+
   onDragOver(event: DragEvent) {
     event.preventDefault();
     if (!this.isUploading) this.isDragging = true;
